@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🖐️ AI Hand Gesture Recognizer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #f5f8fa;
+            --secondary-bg: #ffffff;
+            --accent-color: #4a90e2;
+            --accent-dark: #357ABD;
+            --text-color-dark: #334155;
+            --text-color-light: #667e9c;
+            --border-color: #e0e6eb;
+            --shadow-light: 0 2px 8px rgba(0, 0, 0, 0.05);
+            --shadow-medium: 0 5px 15px rgba(0, 0, 0, 0.08);
+            --border-radius-sm: 6px;
+            --border-radius-md: 12px;
+            --border-radius-lg: 25px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--primary-bg);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px;
+            color: var(--text-color-dark);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .header {
+            text-align: center;
+            color: var(--text-color-dark);
+            margin-bottom: 40px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 8px;
+            text-shadow: none;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.8;
+            font-weight: 400;
+            color: var(--text-color-light);
+        }
+
+        .main-container {
+            display: flex;
+            gap: 25px;
+            max-width: 1100px;
+            width: 100%;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .panel {
+            background: var(--secondary-bg);
+            border-radius: var(--border-radius-md);
+            padding: 25px;
+            box-shadow: var(--shadow-medium);
+            flex: 1;
+            min-width: 300px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .video-container {
+            position: relative; /* Crucial for absolute positioning of the object */
+            max-width: 800px;
+            overflow: hidden; /* Ensure object doesn't draw outside bounds */
+        }
+
+        .video-frame {
+            width: 100%;
+            height: auto;
+            border-radius: var(--border-radius-sm);
+            border: 2px solid var(--accent-color);
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
+            display: block;
+        }
+
+        /* New CSS for the interactive object (Pixelated Style) */
+        .interactive-object {
+            position: absolute;
+            background-color: var(--object-color, #ff6347); /* Use CSS variable for color */
+            border: 4px outset var(--object-border-color, #cd5c5c); /* Outset border for pixel effect */
+            /* No border-radius for blocky look */
+            box-shadow: 0px 4px 0px 0px rgba(0, 0, 0, 0.4); /* Pixel-like shadow */
+            z-index: 10;
+            transition: background-color 0.1s ease, transform 0.05s linear, left 0.05s linear, top 0.05s linear, width 0.05s linear, height 0.05s linear;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: 'Press Start 2P', cursive; /* Pixel font for object text */
+            font-size: 1.2rem; /* Adjusted for pixel font */
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.5); /* Hard pixel shadow */
+            cursor: grab;
+            user-select: none;
+            image-rendering: pixelated; /* Attempt to pixelate content if it's an image */
+            text-rendering: optimizeSpeed; /* For older browsers for pixel art */
+        }
+
+        /* Adjust border color when holding */
+        .interactive-object.holding {
+            background-color: var(--object-color-holding, #4CAF50); /* Green when holding */
+            border-color: var(--object-border-color-holding, #388E3C);
+            cursor: grabbing;
+            box-shadow: 0px 2px 0px 0px rgba(0, 0, 0, 0.4); /* Shorter shadow when picked up */
+        }
+
+        /* Bounce animation */
+        .interactive-object.bouncing {
+            animation: bounce 0.5s ease-out; /* Adjusted speed and easing */
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0) translate(-50%, -50%); } /* Stay centered horizontally */
+            50% { transform: translateY(-30px) translate(-50%, -50%); } /* Jump up */
+        }
+
+        /* Debug dot for index tip visualization */
+        .debug-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: rgb(0, 0, 255); /* Blue */
+            border: 1px solid rgb(255, 255, 255);
+            border-radius: 50%;
+            z-index: 100;
+            display: none;
+            transition: left 0.05s linear, top 0.05s linear;
+        }
+
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--border-radius-lg);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-light);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            background-color: var(--accent-dark);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn:disabled {
+            background-color: #dcdcde;
+            cursor: not-allowed;
+            opacity: 0.8;
+            box-shadow: none;
+        }
+
+        .status-indicator-wrapper {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: var(--text-color-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #dc3545;
+            box-shadow: 0 0 6px rgba(220, 53, 69, 0.4);
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .status-indicator.active {
+            background: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.6);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .info-panel {
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-panel h3 {
+            color: var(--text-color-dark);
+            margin-bottom: 20px;
+            font-size: 1.6rem;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .gesture-display {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 20px;
+            border-radius: var(--border-radius-sm);
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-light);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .gesture-name {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-shadow: none;
+            min-height: 2.8rem;
+        }
+
+        .hand-count, .object-state {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .gesture-list {
+            background: var(--primary-bg);
+            border-radius: var(--border-radius-sm);
+            padding: 15px;
+            flex-grow: 1;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.03);
+            overflow-y: auto;
+            max-height: 400px;
+            column-count: 2;
+            column-gap: 15px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .gesture-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background: var(--secondary-bg);
+            border-radius: var(--border-radius-sm);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+            font-weight: 500;
+            color: var(--text-color-dark);
+            break-inside: avoid-column;
+            border: 1px solid var(--border-color);
+        }
+
+        .gesture-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .gesture-item:hover {
+            transform: translateX(3px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .gesture-item.highlight {
+            background-color: #e6f2ff;
+            border: 1px solid var(--accent-color);
+            box-shadow: 0 3px 10px rgba(74, 144, 226, 0.15);
+            transform: scale(1.01);
+        }
+
+        .gesture-emoji {
+            font-size: 1.6rem;
+            line-height: 1;
+        }
+
+        .gesture-category-header {
+            color: var(--text-color-dark);
+            margin-top: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            column-span: all;
+            padding-bottom: 5px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .instructions {
+            background-color: var(--secondary-bg);
+            border-radius: var(--border-radius-md);
+            padding: 25px;
+            margin-top: 35px;
+            color: var(--text-color-dark);
+            max-width: 800px;
+            width: 100%;
+            box-shadow: var(--shadow-medium);
+            animation: fadeInUp 1s ease-out;
+            border: 1px solid var(--border-color);
+        }
+
+        .instructions h4 {
+            margin-bottom: 18px;
+            color: var(--text-color-dark);
+            font-size: 1.4rem;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding-left: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 12px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+            padding-left: 25px;
+            position: relative;
+            font-size: 1rem;
+            line-height: 1.4;
+            opacity: 0.9;
+        }
+
+        .instructions li::before {
+            content: "✨";
+            position: absolute;
+            left: 0;
+            font-size: 1.1rem;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .main-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .video-container, .info-panel {
+                max-width: 100%;
+            }
+            .gesture-list {
+                column-count: 1;
+            }
+            .gesture-category-header {
+                column-span: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 15px;
+            }
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            .header p {
+                font-size: 0.95rem;
+            }
+            .panel {
+                padding: 20px;
+            }
+            .btn {
+                padding: 10px 18px;
+                font-size: 0.95rem;
+            }
+            .gesture-name {
+                font-size: 2rem;
+            }
+            .gesture-list {
+                max-height: 220px;
+            }
+            .instructions ul {
+                grid-template-columns: 1fr;
+            }
+            .instructions {
+                padding: 20px;
+            }
+            .instructions h4 {
+                font-size: 1.2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            .header p {
+                font-size: 0.85rem;
+            }
+            .btn {
+                font-size: 0.85rem;
+                padding: 8px 12px;
+            }
+            .controls {
+                flex-direction: column;
+                gap: 8px;
+            }
+            .gesture-name {
+                font-size: 1.6rem;
+                min-height: 2.2rem;
+            }
+            .instructions li {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>👋 AI Hand Gesture Recognizer</h1>
+        <p>Real-time hand tracking and gesture detection with cutting-edge AI</p>
+    </div>
+
+    <div class="main-container">
+        <div class="video-container panel">
+            <img id="videoFeed" class="video-frame" src="{{ url_for('video_feed') }}" alt="Live Camera Feed">
+            <div id="interactiveObject" class="interactive-object">👾</div>
+            <div id="debugDot" class="debug-dot"></div>
+
+            <div class="controls">
+                <button class="btn" id="startButton" onclick="startCamera()">▶️ Start Camera</button>
+                <button class="btn" id="stopButton" onclick="stopCamera()">⏹️ Stop Camera</button>
+            </div>
+            <div class="status-indicator-wrapper">
+                <span id="cameraStatusText">Camera Status: Offline</span>
+                <span class="status-indicator" id="cameraStatus"></span>
+            </div>
+        </div>
+
+        <div class="info-panel panel">
+            <h3>✨ Detected Gestures</h3>
+            
+            <div class="gesture-display">
+                <div class="gesture-name" id="currentGesture">Awaiting Gesture...</div>
+                <div class="hand-count" id="handCount">Hands detected: 0</div>
+                <div class="object-state" id="objectStateDisplay">Object State: Idle</div>
+            </div>
+
+            <div class="gesture-list" id="gestureList">
+                <h4 class="gesture-category-header">Common Gestures</h4>
+                <div class="gesture-item" data-gesture-name="Fist">
+                    <span>✊ Fist (Drop Object)</span>
+                    <span class="gesture-emoji">✊</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Point">
+                    <span>☝️ Point (Move Object)</span>
+                    <span class="gesture-emoji">☝️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Thumbs Up">
+                    <span>👍 Thumbs Up (Bounce Object)</span>
+                    <span class="gesture-emoji">👍</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Peace Sign">
+                    <span>✌️ Peace Sign (Change Color)</span>
+                    <span class="gesture-emoji">✌️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Rock On">
+                    <span>🤟 Rock On</span>
+                    <span class="gesture-emoji">🤟</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Open Palm">
+                    <span>🖐️ Open Palm (Pickup Object)</span>
+                    <span class="gesture-emoji">🖐️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="OK Gesture">
+                    <span>👌 OK Gesture</span>
+                    <span class="gesture-emoji">👌</span>
+                </div>
+                 <div class="gesture-item" data-gesture-name="ASL L">
+                    <span>📐 ASL L (Toggle Size)</span>
+                    <span class="gesture-emoji">📐</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="One Finger">
+                    <span>👆 One Finger</span>
+                    <span class="gesture-emoji">1️⃣</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Two Fingers">
+                    <span>✌️ Two Fingers</span>
+                    <span class="gesture-emoji">2️⃣</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Three Fingers">
+                    <span>👌 Three Fingers</span>
+                    <span class="gesture-emoji">3️⃣</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Four Fingers">
+                    <span>✋ Four Fingers</span>
+                    <span class="gesture-emoji">4️⃣</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="Five Fingers">
+                    <span>🖐️ Five Fingers</span>
+                    <span class="gesture-emoji">5️⃣</span>
+                </div>
+                
+                <h4 class="gesture-category-header">ASL Alphabet (Basic Static Signs)</h4>
+                <div class="gesture-item" data-gesture-name="ASL A">
+                    <span>🅰️ ASL A</span>
+                    <span class="gesture-emoji">🅰️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL B">
+                    <span>🅱️ ASL B</span>
+                    <span class="gesture-emoji">🅱️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL C">
+                    <span>©️ ASL C</span>
+                    <span class="gesture-emoji">©️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL D">
+                    <span>👆 ASL D</span> 
+                    <span class="gesture-emoji">👆</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL E">
+                    <span>✊ ASL E</span> 
+                    <span class="gesture-emoji">✊</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL F">
+                    <span>👌 ASL F</span> 
+                    <span class="gesture-emoji">👌</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL G">
+                    <span>👉 ASL G</span> 
+                    <span class="gesture-emoji">👉</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL H">
+                    <span>✌️ ASL H</span> 
+                    <span class="gesture-emoji">✌️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL I">
+                    <span>⬆️ ASL I</span> 
+                    <span class="gesture-emoji">⬆️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL J">
+                    <span>🤙 ASL J</span> 
+                    <span class="gesture-emoji">🤙</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL K">
+                    <span>🙏 ASL K</span> 
+                    <span class="gesture-emoji">🙏</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL L">
+                    <span>📐 ASL L</span> 
+                    <span class="gesture-emoji">📐</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL M">
+                    <span>🤞 ASL M</span> 
+                    <span class="gesture-emoji">🤞</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL N">
+                    <span>✊ ASL N</span> 
+                    <span class="gesture-emoji">✊</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL O">
+                    <span>⭕ ASL O</span> 
+                    <span class="gesture-emoji">⭕</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL P">
+                    <span>🙏 ASL P</span> 
+                    <span class="gesture-emoji">🙏</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL Q">
+                    <span>✊ ASL Q</span> 
+                    <span class="gesture-emoji">✊</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL R">
+                    <span>🤞 ASL R</span> 
+                    <span class="gesture-emoji">🤞</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL S">
+                    <span>✊ ASL S</span> 
+                    <span class="gesture-emoji">✊</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL T">
+                    <span>✊ ASL T</span> 
+                    <span class="gesture-emoji">✊</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL U">
+                    <span>⬆️ ASL U</span> 
+                    <span class="gesture-emoji">⬆️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL V">
+                    <span>✅ ASL V</span> 
+                    <span class="gesture-emoji">✅</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL W">
+                    <span>🔺 ASL W</span> 
+                    <span class="gesture-emoji">🔺</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL X">
+                    <span>✖️ ASL X</span> 
+                    <span class="gesture-emoji">✖️</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL Y">
+                    <span>🤙 ASL Y</span> 
+                    <span class="gesture-emoji">🤙</span>
+                </div>
+                <div class="gesture-item" data-gesture-name="ASL Z">
+                    <span>〰️ ASL Z</span> 
+                    <span class="gesture-emoji">〰️</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="instructions">
+        <h4>💡 How to Use</h4>
+        <ul>
+            <li>Click "**Start Camera**" to activate your webcam and begin real-time hand tracking.</li>
+            <li>Position your hand(s) clearly in front of the camera for optimal detection.</li>
+            <li>Use the "**Open Palm**" gesture near the object to pick it up.</li>
+            <li>Once holding, continue with "**Open Palm**" or change to "**Point**" to move the object around.</li>
+            <li>Use the "**Fist**" gesture to drop the object.</li>
+            <li>Perform "**Peace Sign**" while holding the object to change its color.</li>
+            <li>Perform "**ASL L**" while holding the object to toggle its size.</li>
+            <li>Perform "**Thumbs Up**" while holding the object (or after dropping) to make it bounce.</li>
+            <li>Ensure adequate lighting in your environment to improve the accuracy of gesture recognition.</li>
+        </ul>
+    </div>
+
+    <script>
+        let isTracking = false;
+        let lastHighlightedGesture = null;
+
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const cameraStatusText = document.getElementById('cameraStatusText');
+        const cameraStatusIndicator = document.getElementById('cameraStatus');
+        const currentGestureEl = document.getElementById('currentGesture');
+        const handCountEl = document.getElementById('handCount');
+        const objectStateDisplay = document.getElementById('objectStateDisplay');
+        const gestureItems = document.querySelectorAll('.gesture-item');
+        const interactiveObject = document.getElementById('interactiveObject');
+        const videoFeed = document.getElementById('videoFeed');
+        const debugDot = document.getElementById('debugDot');
+
+        // Function to update the camera status display and button states
+        function updateCameraStatus(active, message = "Camera Status: Offline", color = '#dc3545') {
+            if (active) {
+                cameraStatusIndicator.classList.add('active');
+                startButton.disabled = true;
+                stopButton.disabled = false;
+            } else {
+                cameraStatusIndicator.classList.remove('active');
+                startButton.disabled = false;
+                stopButton.disabled = true;
+            }
+            cameraStatusText.textContent = message;
+            cameraStatusText.style.color = color;
+        }
+
+        function startCamera() {
+            updateCameraStatus(false, "Camera starting...", '#ffc107');
+            fetch('/start_camera')
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    if (data.status === 'success') {
+                        isTracking = true;
+                        updateCameraStatus(true, "Camera Status: Live", '#28a745');
+                        startGestureTracking();
+                        // Reset object visual state on camera start
+                        interactiveObject.style.left = '50%';
+                        interactiveObject.style.top = '50%';
+                        interactiveObject.style.transform = 'translate(-50%, -50%)'; // Ensure proper centering with transform
+                        interactiveObject.classList.remove('holding');
+                        interactiveObject.classList.remove('bouncing'); // Remove bounce class
+                        debugDot.style.display = 'none';
+                    } else {
+                        updateCameraStatus(false, data.message, '#dc3545');
+                        alert('Failed to start camera: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting camera:', error);
+                    updateCameraStatus(false, "Camera start error", '#dc3545');
+                    alert('An error occurred while trying to start the camera. Please check your connection or camera permissions.');
+                });
+        }
+
+        function stopCamera() {
+            updateCameraStatus(false, "Camera stopping...", '#ffc107');
+            fetch('/stop_camera')
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    isTracking = false;
+                    updateCameraStatus(false, "Camera Status: Offline", '#dc3545');
+                    currentGestureEl.textContent = 'Awaiting Gesture...';
+                    handCountEl.textContent = 'Hands detected: 0';
+                    objectStateDisplay.textContent = 'Object State: Idle';
+                    removeHighlight();
+                    // Reset or hide object when camera stops
+                    interactiveObject.style.left = '50%';
+                    interactiveObject.style.top = '50%';
+                    interactiveObject.style.transform = 'translate(-50%, -50%)';
+                    interactiveObject.classList.remove('holding');
+                    interactiveObject.classList.remove('bouncing'); // Remove bounce class
+                    debugDot.style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Error stopping camera:', error);
+                    updateCameraStatus(false, "Camera stop error", '#dc3545');
+                    alert('An error occurred while trying to stop the camera.');
+                });
+        }
+
+        function startGestureTracking() {
+            if (!isTracking) return;
+            
+            fetch('/gesture_data')
+                .then(response => response.json())
+                .then(data => {
+                    updateGestureDisplay(data);
+                    updateObjectPositionAndFeatures(data); // Pass full data for new features
+                    
+                    // Update debug dot for the first hand's index tip (if available)
+                    if (data.hand_count > 0 && data.gestures[0] && data.gestures[0].landmarks.length > 8) {
+                        const indexTip = data.gestures[0].landmarks[8]; // Landmark 8 is Index finger tip
+                        const videoRect = videoFeed.getBoundingClientRect();
+                        const scaleX = videoRect.width / 640;
+                        const scaleY = videoRect.height / 480;
+
+                        const dotX = indexTip[0] * scaleX;
+                        const dotY = indexTip[1] * scaleY;
+
+                        debugDot.style.left = `${dotX - (debugDot.offsetWidth / 2)}px`;
+                        debugDot.style.top = `${dotY - (debugDot.offsetHeight / 2)}px`;
+                        debugDot.style.display = 'block';
+                    } else {
+                        debugDot.style.display = 'none'; // Hide if no hands detected
+                    }
+
+                    if (isTracking) {
+                        setTimeout(startGestureTracking, 150); // Fetch data every ~150ms
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching gesture data:', error);
+                    if (isTracking) {
+                        setTimeout(startGestureTracking, 1000); // Longer delay on error
+                    }
+                });
+        }
+
+        function removeHighlight() {
+            if (lastHighlightedGesture) {
+                lastHighlightedGesture.classList.remove('highlight');
+                lastHighlightedGesture = null;
+            }
+        }
+
+        function updateGestureDisplay(data) {
+            handCountEl.textContent = `Hands detected: ${data.hand_count}`;
+            objectStateDisplay.textContent = `Object State: ${data.object_state.charAt(0).toUpperCase() + data.object_state.slice(1)}`;
+
+            removeHighlight();
+
+            if (data.gestures && data.gestures.length > 0) {
+                const detectedGestureName = data.gestures[0].gesture;
+                
+                const matchingGestureItem = Array.from(gestureItems).find(item => 
+                    item.dataset.gestureName === detectedGestureName
+                );
+
+                if (matchingGestureItem) {
+                    matchingGestureItem.classList.add('highlight');
+                    lastHighlightedGesture = matchingGestureItem;
+                }
+
+                const formattedGestures = data.gestures.map(g => {
+                    switch(g.gesture) {
+                        case 'Fist': return '✊ Fist';
+                        case 'Point': return '☝️ Point';
+                        case 'Thumbs Up': return '👍 Thumbs Up';
+                        case 'Peace Sign': return '✌️ Peace Sign';
+                        case 'Rock On': return '🤟 Rock On';
+                        case 'Open Palm': return '🖐️ Open Palm';
+                        case 'OK Gesture': return '👌 OK Gesture';
+                        case 'One Finger': return '👆 One Finger';
+                        case 'Two Fingers': return '✌️ Two Fingers';
+                        case 'Three Fingers': return '👌 Three Fingers';
+                        case 'Four Fingers': return '✋ Four Fingers';
+                        case 'Five Fingers': return '🖐️ Five Fingers';
+                        case 'ASL A': return '🅰️ ASL A';
+                        case 'ASL B': return '🅱️ ASL B';
+                        case 'ASL C': return '©️ ASL C';
+                        case 'ASL D': return '👆 ASL D';
+                        case 'ASL E': return '✊ ASL E';
+                        case 'ASL F': return '👌 ASL F';
+                        case 'ASL G': return '👉 ASL G';
+                        case 'ASL H': return '✌️ ASL H';
+                        case 'ASL I': return '⬆️ ASL I';
+                        case 'ASL J': return '🤙 ASL J';
+                        case 'ASL K': return '🙏 ASL K';
+                        case 'ASL L': return '📐 ASL L';
+                        case 'ASL M': return '🤞 ASL M';
+                        case 'ASL N': return '✊ ASL N';
+                        case 'ASL O': return '⭕ ASL O';
+                        case 'ASL P': return '🙏 ASL P';
+                        case 'ASL Q': return '✊ ASL Q';
+                        case 'ASL R': return '🤞 ASL R';
+                        case 'ASL S': return '✊ ASL S';
+                        case 'ASL T': return '✊ ASL T';
+                        case 'ASL U': return '⬆️ ASL U';
+                        case 'ASL V': return '✅ ASL V';
+                        case 'ASL W': return '🔺 ASL W';
+                        case 'ASL X': return '✖️ ASL X';
+                        case 'ASL Y': return '🤙 ASL Y';
+                        case 'ASL Z': return '〰️ ASL Z';
+                        default: return g.gesture; 
+                    }
+                }).join(' & ');
+                
+                currentGestureEl.textContent = formattedGestures;
+            } else {
+                currentGestureEl.textContent = 'Awaiting Gesture...';
+            }
+        }
+
+        // New function to update object position and apply features
+        function updateObjectPositionAndFeatures(data) {
+            const videoRect = videoFeed.getBoundingClientRect();
+            const backend_width = 640;
+            const backend_height = 480;
+            
+            const scaleX = videoRect.width / backend_width;
+            const scaleY = videoRect.height / backend_height;
+
+            const objectX = data.object_position.x * scaleX;
+            const objectY = data.object_position.y * scaleY;
+
+            // Apply size
+            interactiveObject.style.width = `${data.object_size.width * scaleX}px`;
+            interactiveObject.style.height = `${data.object_size.height * scaleY}px`;
+
+            // Apply position
+            interactiveObject.style.left = `${objectX - (interactiveObject.offsetWidth / 2)}px`;
+            interactiveObject.style.top = `${objectY - (interactiveObject.offsetHeight / 2)}px`;
+            
+            // Apply holding state class
+            if (data.object_state === 'holding') {
+                interactiveObject.classList.add('holding');
+            } else {
+                interactiveObject.classList.remove('holding');
+            }
+
+            // Apply color (using CSS variables for dynamic styling)
+            interactiveObject.style.setProperty('--object-color', data.object_color);
+            // Derive a slightly darker border color for the pixel effect
+            interactiveObject.style.setProperty('--object-border-color', darkenColor(data.object_color, 20));
+
+            // Apply holding specific colors for clarity
+            if (data.object_state === 'holding') {
+                interactiveObject.style.setProperty('--object-color-holding', data.object_color);
+                interactiveObject.style.setProperty('--object-border-color-holding', darkenColor(data.object_color, 20));
+            }
+
+
+            // Handle bounce animation trigger
+            if (data.object_bounce_trigger) {
+                interactiveObject.classList.add('bouncing');
+                // Remove the class after the animation completes to allow re-triggering
+                interactiveObject.addEventListener('animationend', () => {
+                    interactiveObject.classList.remove('bouncing');
+                }, { once: true });
+            }
+        }
+
+        // Helper function to darken a hex color (simple version)
+        function darkenColor(hex, percent) {
+            let f = parseInt(hex.slice(1), 16),
+                t = percent < 0 ? 0 : 255,
+                p = percent < 0 ? percent * -1 : percent,
+                R = f >> 16,
+                G = (f >> 8) & 0x00ff,
+                B = f & 0x0000ff;
+            return "#" + (
+                0x1000000 + 
+                (Math.round((t - R) * p) + R) * 0x10000 + 
+                (Math.round((t - G) * p) + G) * 0x100 + 
+                (Math.round((t - B) * p) + B)
+            ).toString(16).slice(1);
+        }
+
+        window.onload = function() {
+            updateCameraStatus(false, "Camera Status: Offline");
+            // Set initial centered position for the object
+            interactiveObject.style.left = '50%';
+            interactiveObject.style.top = '50%';
+            interactiveObject.style.transform = 'translate(-50%, -50%)';
+            interactiveObject.style.display = 'block';
+            interactiveObject.style.width = '50px'; // Initial size set here as well
+            interactiveObject.style.height = '50px';
+            debugDot.style.display = 'none';
+            setTimeout(startCamera, 1000);
+        };
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                if (isTracking) {
+                    isTracking = false; 
+                    updateCameraStatus(false, "Camera Status: Paused (Tab Hidden)", '#ffc107');
+                }
+            } else {
+                if (cameraStatusIndicator.classList.contains('active') && !isTracking) {
+                    isTracking = true;
+                    updateCameraStatus(true, "Camera Status: Live", '#28a745');
+                    startGestureTracking();
+                } else if (!cameraStatusIndicator.classList.contains('active') && !isTracking) {
+                    updateCameraStatus(false, "Camera Status: Offline", '#dc3545');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
